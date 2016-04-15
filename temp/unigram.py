@@ -5,7 +5,7 @@ from processTweets import *
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn import svm
 from sklearn import cross_validation
-import numpy as np
+
 sys.path.insert(0,'ark-tokenizer')
 from ark import tokenizeRawTweetText
 
@@ -17,11 +17,10 @@ line=fp.readline()
 ttc=0
 while line:
     rnd=random.random()
-    if rnd<0.35 :
+    if rnd<0.05 :
         fp_te.write(line)
         ttc+=1
-    else:
-	fp_te.write(line)
+    fp_tr.write(line)
     line=fp.readline()
 
 print "Total TestTweets %d" %(ttc)
@@ -67,7 +66,6 @@ for word in wordlist:
 
 fp.close()
 
-wordlist = []
 #print pos_count+neg_count+neu_count
 
 #create boolean matrix (no. of tweets)*(no. of words in dict)
@@ -112,39 +110,27 @@ while line:
         
     
     line=fp.readline()
-print len(wordlist)
+
 
 total_tweets=pos_count+neg_count+neu_count
 
 
-def parse_to_classifier():
+def parse_to_classifier(pos_matrix,neg_matrix,neu_matrix):
 	final_matrix = []
-	
-	global pos_matrix
 	map(lambda x: final_matrix.append(x+[0,]),pos_matrix)
-
-	global neg_matrix
-	pos_matrix = []
 	map(lambda x: final_matrix.append(x+[1,]),neg_matrix)
-
-
-	global neu_matrix
-	neg_matrix = []
 	map(lambda x: final_matrix.append(x+[2,]),neu_matrix)
-
-	neu_matrix = []
 	final_matrix = np.array(final_matrix)
 	np.random.shuffle(final_matrix)
 	part = len(final_matrix)/10
+	train_X = final_matrix[:,:-1]
 	train_Y = final_matrix[:,-1]
-	return final_matrix[:,:-1],train_Y
 
-word_dict = {}
-word_list = []
-train_X,train_Y = parse_to_classifier()
+
+train_X,train_Y = parse_to_classifier(pos_matrix,neg_matrix,neu_matrix)
 print "dimension", len(train_X[0])
 #trained_clf = train_classifier(LinearSVC(random_state=0),train_X,train_Y)
-score = cross_validation.cross_val_score(OneVsOneClassifier(svm.LinearSVC(random_state=0)),train_X,train_Y,cv=1)
+score = cross_validation.cross_val_score(OneVsOneClassifier(svm.LinearSVC(random_state=0)),train_X,train_Y,cv=5)
 print "average accuracy of svm ",score.mean()
 #classifying
 #classifying

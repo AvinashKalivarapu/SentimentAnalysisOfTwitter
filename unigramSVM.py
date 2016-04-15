@@ -5,31 +5,34 @@ from processTweets import *
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn import svm
 from sklearn import cross_validation
+from scipy.sparse import *
 import numpy as np
+from sklearn.utils import shuffle
 sys.path.insert(0,'ark-tokenizer')
 from ark import tokenizeRawTweetText
 
 fp = open("preprocessedTweets.txt", 'r')
-fp_tr=open("trainpreprocessedTweets.txt", 'w+')
+
+"""fp_tr=open("trainpreprocessedTweets.txt", 'w+')
 fp_te=open("testpreprocessedTweets.txt", 'w+')
 line=fp.readline()
 
 ttc=0
 while line:
     rnd=random.random()
-    if rnd<0.35 :
+    if rnd<0.99 :
         fp_te.write(line)
         ttc+=1
     else:
-	fp_te.write(line)
+        fp_tr.write(line)
     line=fp.readline()
 
 print "Total TestTweets %d" %(ttc)
 
 fp_tr.close()
 fp_te.close()
-
-fp = open("trainpreprocessedTweets.txt", 'r')
+"""
+fp = open("preprocessedTweets.txt", 'r')
 
 #Create dictionary of words
 
@@ -59,7 +62,20 @@ while line:
         wordict[tokens[i]]=0
     line=fp.readline()
 
+
+
+
+#Read Features(NON_ENG,REPEAT,EMOTICON,ACRONYM and WN_SCORE) here and them to dictionary)
+wordict['NON_ENG']=0
+wordict['REPEAT']=0
+wordict['EMOTICON']=0
+wordict['ACRONYM']=0
+wordict['WN_SCORE']=0
+
+#sort dictionary
 wordlist=sorted(wordict)
+
+#Assign index number to each word in dictionary
 wordcount=0
 for word in wordlist:
     wordict[word]=wordcount;
@@ -69,16 +85,21 @@ fp.close()
 
 wordlist = []
 #print pos_count+neg_count+neu_count
-
 #create boolean matrix (no. of tweets)*(no. of words in dict)
 
+#pos_matrix = [[0 for i in range(wordcount)] for j in range(pos_count)]
+#neg_matrix = [[0 for i in range(wordcount)] for j in range(neg_count)]
+#neu_matrix = [[0 for i in range(wordcount)] for j in range(neu_count)]
+pos_matrix = dok_matrix((pos_count,wordcount))
+neg_matrix = dok_matrix((neg_count,wordcount))
+neu_matrix = dok_matrix((neu_count,wordcount))
 
-pos_matrix = [[0 for i in range(wordcount)] for j in range(pos_count)]
-neg_matrix = [[0 for i in range(wordcount)] for j in range(neg_count)]
-neu_matrix = [[0 for i in range(wordcount)] for j in range(neu_count)]
+fp = open("preprocessedTweets.txt", 'r')
+feature_fp=open("processedTweet_vs_features.txt",'r')
 
-fp = open("trainpreprocessedTweets.txt", 'r')
+
 line=fp.readline()
+feature=feature_fp.readline()
 
 pos=0
 neg=0
@@ -86,86 +107,86 @@ neu=0
 
 while line:
     line=line.rstrip()
+    feature.rstrip()
+    
     fields=re.split(r'\t+',line)
+    featurelist=feature.split(" ")
+    
     if len(fields) <2:
+        feature=feature_fp.readline()
         line=fp.readline()
         continue
     
     tokens=re.split(' ',fields[1])
     
     size=len(tokens)
+    feature_size=len(featurelist)
     
     if "positive"==fields[0]:
         for i in range(size):
-            pos_matrix[pos][wordict[tokens[i]]]=1
+            pos_matrix[pos,wordict[tokens[i]]]=1
+        pos_matrix[pos,wordict['NON_ENG']]=featurelist[0]
+        pos_matrix[pos,wordict['REPEAT']]=featurelist[1]
+        pos_matrix[pos,wordict['EMOTICON']]=featurelist[2]
+        pos_matrix[pos,wordict['ACRONYM']]=featurelist[3]
+        pos_matrix[pos,wordict['WN_SCORE']]=featurelist[4]
         pos+=1
 
     elif "negative"==fields[0]:
         for i in range(size):
-            neg_matrix[neg][wordict[tokens[i]]]=1
+            neg_matrix[neg,wordict[tokens[i]]]=1
+
+        neg_matrix[neg,wordict['NON_ENG']]=featurelist[0]
+        neg_matrix[neg,wordict['REPEAT']]=featurelist[1]
+        neg_matrix[neg,wordict['EMOTICON']]=featurelist[2]
+        neg_matrix[neg,wordict['ACRONYM']]=featurelist[3]
+        neg_matrix[neg,wordict['WN_SCORE']]=featurelist[4]
         neg+=1
 
     else:
         for i in range(size):
-            neu_matrix[neu][wordict[tokens[i]]]=1
+            neu_matrix[neu,wordict[tokens[i]]]=1
+        neu_matrix[neg,wordict['NON_ENG']]=featurelist[0]
+        neu_matrix[neg,wordict['REPEAT']]=featurelist[1]
+        neu_matrix[neg,wordict['EMOTICON']]=featurelist[2]
+        neu_matrix[neg,wordict['ACRONYM']]=featurelist[3]
+        neu_matrix[neg,wordict['WN_SCORE']]=featurelist[4]
         neu+=1
-        
-    
+
     line=fp.readline()
-print len(wordlist)
+    feature=feature_fp.readline()
+
+pos_matrix.tocsr()
+neg_matrix.tocsr()
+neu_matrix.tocsr()
+
+pos_matrix = hstack([pos_matrix,csr_matrix([[0],]*pos_count)])
+neg_matrix = hstack([neg_matrix,csr_matrix([[1],]*neg_count)])
+neu_matrix = hstack([neu_matrix,csr_matrix([[2],]*neu_count)])
+final_matrix = vstack([pos_matrix,neg_matrix])
+final_matrix = vstack([final_matrix,neu_matrix])
+final_matrix = shuffle(final_matrix)
+train_Y = final_matrix[:,-1].toarray()[:,0]
+
+
+print "shape",final_matrix.get_shape()
 
 total_tweets=pos_count+neg_count+neu_count
 
 
-def parse_to_classifier():
-	final_matrix = []
-	
-	global pos_matrix
-	map(lambda x: final_matrix.append(x+[0,]),pos_matrix)
-
-	global neg_matrix
-	pos_matrix = []
-	map(lambda x: final_matrix.append(x+[1,]),neg_matrix)
-
-
-	global neu_matrix
-	neg_matrix = []
-	map(lambda x: final_matrix.append(x+[2,]),neu_matrix)
-
-	neu_matrix = []
-	final_matrix = np.array(final_matrix)
-	np.random.shuffle(final_matrix)
-	part = len(final_matrix)/10
-	train_Y = final_matrix[:,-1]
-	return final_matrix[:,:-1],train_Y
 
 word_dict = {}
 word_list = []
-train_X,train_Y = parse_to_classifier()
-print "dimension", len(train_X[0])
+#train_X,train_Y = parse_to_classifier()
 #trained_clf = train_classifier(LinearSVC(random_state=0),train_X,train_Y)
-score = cross_validation.cross_val_score(OneVsOneClassifier(svm.LinearSVC(random_state=0)),train_X,train_Y,cv=1)
+score = cross_validation.cross_val_score(OneVsOneClassifier(svm.LinearSVC(random_state=0)),final_matrix[:,:-1],train_Y,cv=5)
 print "average accuracy of svm ",score.mean()
-#classifying
 #classifying
     
 pos_prob=float(pos_count)/float(total_tweets)
 neg_prob=float(neg_count)/float(total_tweets)
 neu_prob=float(neu_count)/float(total_tweets)
 
-#Create wordnet dictionary
-fp_wn=open("wordnet.txt",'r')
-
-wn_dict={}
-line=fp_wn.readline()
-while line:
-    line=line.rstrip()
-    fields=line.split(":")
-    if fields[0] not in wn_dict:
-        wn_dict[fields[0]]=float(fields[1])
-    line=fp_wn.readline()
-
-fp_wn.close()
 
 fp = open("testpreprocessedTweets.txt", 'r')
 line=fp.readline()
