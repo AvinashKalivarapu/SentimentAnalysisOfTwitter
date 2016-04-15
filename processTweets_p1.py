@@ -1,5 +1,4 @@
 import re
-import nltk
 from DictionaryBuilder import *
 
 
@@ -8,30 +7,12 @@ ed=getEmoticonDictionary()
 ad=getAcronymDictionary()
 swd=getStopwordDictionary()
 
-def getPOSScore(tweet):
-    count = len(tweet)
-    listp = nltk.pos_tag(tweet)
-    a=0
-    nouns_cnt = 0
-    prep_cnt = 0
-    adj_cnt = 0
-    while a < count:
-        if(listp[a][1] == 'NN'):
-            nouns_cnt = nouns_cnt + 1
-        elif(listp[a][1] == 'IN'):
-            prep_cnt = prep_cnt + 1
-        elif(listp[a][1] == 'JJ'):
-            adj_cnt = adj_cnt + 1
-        a = a+1
-    return nouns_cnt,prep_cnt,adj_cnt
-
 specialChar='1234567890#@%^&()_=`{}:"|[]\;\',./\n\t\r '
 
 """ eg greaaaaaaaaaaaaat->greaaat
         param: tweet - list of words in tweet
         return: list of words and count of words which has repitetion"""
-def replaceRepetition(tweet):
-    count=0
+def replaceRepetition(tweet):    
     for i in range(len(tweet)):
         x=list(tweet[i])
         if len(x)>3:
@@ -40,24 +21,21 @@ def replaceRepetition(tweet):
                 if(x[j-3]==x[j-2]==x[j-1]==x[j]):
                     x[j-3]=''
                     if flag==0:
-                        count+=1
                         flag=1
             tweet[i]=''.join(x).strip(specialChar)
-    return tweet,count
+    return tweet
 
 """remove the non-english or better non-ascii characters
         param: list of words in tweets
         return: tweet with English words only and the count of words removed."""
 def removeNonEnglishWords(tweet):
     newTweet=[]
-    count=0
     for i in range(len(tweet)):
         if tweet[i]!='':
             chk=re.match(r'([a-zA-z0-9 \+\?\.\*\^\$\(\)\[\]\{\}\|\\/:;\'\"><,.#@!~`%&-_=])+$',tweet[i])
             if chk:
-                count+=1
                 newTweet.append(tweet[i])
-    return newTweet,count
+    return newTweet
 
 """Removes the stopwords.
     param: list of words in tweet,a Dictonary of stopword.
@@ -75,29 +53,25 @@ def removeStopWords(stopWordsDict,tweet):
     return: list which contains words in tweet and return list of words in tweet after replacement"""
 
 def replaceEmoticons(emoticonsDict,tweet):
-    isEmoticonPresent=0
     for i in range(len(tweet)):
         if tweet[i] in emoticonsDict:
-            isEmoticonPresent=1
             tweet[i]=emoticonsDict[tweet[i]]
-    return tweet,isEmoticonPresent
+    return tweet
 
 
 """expand the Acronym in tweet
     param: acronym dictionary ,acronym as key and abbreviation as value,list of words in tweet.
     return: list of words in tweet after expansion and their count"""
 def expandAcronym(acronymDict,tweet):
-    count=0
     newTweet=[]
     for i in range(len(tweet)):
         word=tweet[i].strip(specialChar)
         if word:
             if word in acronymDict:
-                count+=1
                 newTweet+=acronymDict[word].split(" ")
             else:
                 newTweet+=[tweet[i]]
-    return newTweet,count
+    return newTweet
 
 
 """param: list of words in tweet
@@ -162,9 +136,6 @@ def mergeSpace(tweet):
     param: tweet string
     return: preprocessed tweet """
 def processTweet(tweet,ed,ad,swd):
-    #Other Feature List (NON_ENG,REPEAT,EMOTICON,ACRONYM and WN_SCORE)
-    features=[]
-    
     tweet=tweet.lower()
     tweet = replaceURL(tweet)
     tweet = replaceTarget(tweet)
@@ -174,39 +145,24 @@ def processTweet(tweet,ed,ad,swd):
     tweet = mergeSpace(tweet)
     tweet = tweet.strip('\'"')
     tweet=tweet.strip(' ')
-    tweet=tweet.split(" ")
-	   
-    tweet,count=removeNonEnglishWords(tweet)
     
-    features.append(str(count))
+    tweet=tweet.split(" ")
+    tweet=removeNonEnglishWords(tweet)
+
     #print "Non English",tweet
     
-    tweet,count=replaceRepetition(tweet)
-    features.append(str(count))
-    
+    tweet=replaceRepetition(tweet)
+
     #print "Repetition",tweet
 
-    tweet,count=replaceEmoticons(ed,tweet)
-    features.append(str(count))
-    
+    tweet=replaceEmoticons(ed,tweet)
     #print "Emoticons",tweet
     
-    tweet,count=expandAcronym(ad,tweet)
-    features.append(str(count))
-    
+    tweet=expandAcronym(ad,tweet)
     #print "Acronym",tweet
     tweet=expandNegation(tweet)
     tweet=replaceNegation(tweet)
     #print "Negation",tweet
     tweet=removeStopWords(swd,tweet)
-    for i in xrange(len(tweet)-1,-1,-1):
-        if tweet[i] == '':
-            tweet.pop(i)
-    n,p,a=getPOSScore(tweet)
-    features.append(str(n))
-    features.append(str(p))
-    features.append(str(a))
-
     #print "Stop Words",tweet
-    return tweet,features
-
+    return tweet
