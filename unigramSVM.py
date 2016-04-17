@@ -265,7 +265,7 @@ def test_tweet_svm(tweet):
 def test_tweet_svm_bulk(file_to_read):
 	fp = open(file_to_read,'r')
 	output = open('test_result','w+')
-	while line in output:
+	for line in fp:
 		senti = test_tweet_svm(line)
 		output.write(senti+'\n')
 	output.close()
