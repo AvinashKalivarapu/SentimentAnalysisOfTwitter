@@ -5,6 +5,7 @@ from processTweets import *
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn import svm
 from sklearn import cross_validation
+from sklearn.naive_bayes import BernoulliNB as NB
 from scipy.sparse import *
 import numpy as np
 from sklearn.utils import shuffle
@@ -12,6 +13,18 @@ sys.path.insert(0,'ark-tokenizer')
 from ark import tokenizeRawTweetText
 from DictionaryBuilder import getWordnetDictionary
 fp = open("preprocessedTweets.txt", 'r')
+from flask import Flask,render_template, request, url_for
+
+app = Flask(__name__)
+@app.route('/')
+def default():
+	return render_template('tweet_submit.html')
+	
+@app.route('/result', methods = ['POST'])
+def result():
+	tweet = request.form['yourtweet']
+	senti = test_tweet_svm(tweet)
+	return render_template('tweet_action.html',tweet=senti)
 
 """fp_tr=open("trainpreprocessedTweets.txt", 'w+')
 fp_te=open("testpreprocessedTweets.txt", 'w+')
@@ -194,7 +207,7 @@ train_X,train_Y,pos_matrix,neg_matrix,neu_matrix= make_feature_bulk(pos_count,ne
 total_tweets=pos_count+neg_count+neu_count
 
 def scoring(train_X,train_Y):
-	score = cross_validation.cross_val_score(OneVsOneClassifier(svm.LinearSVC(random_state=0)),train_X,train_Y,cv=5)
+	score = cross_validation.cross_val_score(OneVsOneClassifier(NB()),train_X,train_Y,cv=5)
 	print score
 	print "average accuracy of svm ",score.mean()
 #classifying
@@ -274,7 +287,8 @@ def user_interface(params):
 		print "According to Baysean Decision function",senti2
 		user_interface(params)
 	else:
-		print "invalid parametre"
+		global app
+		app.run()
 
 def test_tweet_baysean(test_tweet):
 	test_tweet,features = processTweet(test_tweet,ed,ad,swd)
